@@ -1,0 +1,21 @@
+{
+    "name": "asimov/solaria/widgets/forms",
+    "description": "Creador de forms para solaria",
+    "license": "MIT",
+    "keywords": ["forms", "solaria", "asimov"],
+    "authors": [
+        {
+            "name": "Pablo Canales",
+            "email": "pablo@asimov.cl"
+        }
+    ],
+    "require": {},
+    "require-dev": {
+        "laravel/framework": "5.1.*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Asimov\\Solaria\\Widgets\\Forms": "src"
+        }
+    }
+}
