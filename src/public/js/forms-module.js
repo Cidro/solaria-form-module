@@ -1,5 +1,5 @@
 (function(global, angular, $, solaria){
-    solaria.controller('FormsWidgetController', function($scope, $http){
+    solaria.controller('FormsModuleController', function($scope, $http){
         $scope.submit = function(){
             $http.post('', $scope.forms[$scope.selectedForm])
                 .success(function(redirect){
