@@ -1,5 +1,5 @@
 {
-    "name": "asimov/solaria/widgets/forms",
+    "name": "asimov/solaria/modules/forms",
     "description": "Creador de forms para solaria",
     "license": "MIT",
     "keywords": ["forms", "solaria", "asimov"],
@@ -15,7 +15,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Asimov\\Solaria\\Widgets\\Forms\\": "src/"
+            "Asimov\\Solaria\\Modules\\Forms\\": "src/"
         }
     }
 }
