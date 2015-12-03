@@ -1,6 +1,6 @@
 <?php
 
-namespace Asimov\Solaria\Widgets\Forms;
+namespace Asimov\Solaria\Modules\Forms;
 
 use Illuminate\Support\ServiceProvider;
 use Route;
@@ -15,33 +15,33 @@ class FormsModuleServiceProvider extends ServiceProvider{
     }
 
     /**
-     * Registra una instancia del widget en la aplicaciÃ³n
+     * Registra una instancia del modulo en la aplicacion
      *
      * @return void
      */
     public function register() {
-        $widgetLoader = $this->app->make('solaria.widgetloader');
-        $widgetLoader->add(new Forms());
+        $moduleLoader = $this->app->make('solaria.moduleloader');
+        $moduleLoader->add(new Forms());
     }
 
     /**
-     * Registra las rutas del widget
+     * Registra las rutas del modulo
      */
     private function registerRoutes() {
-        Route::group(['middleware' => 'auth', 'prefix' => 'backend', 'namespace' => 'Asimov\Solaria\Widgets\Forms\Http\Controllers'], function() {
-            Route::controller('/widgets/forms', 'FormsController');
+        Route::group(['middleware' => 'auth', 'prefix' => 'backend', 'namespace' => 'Asimov\Solaria\Modules\Forms\Http\Controllers'], function() {
+            Route::controller('/modules/forms', 'FormsController');
         });
     }
 
     /**
-     * Registra las vistas del widget
+     * Registra las vistas del modulo
      */
     private function registerViews() {
-        $this->loadViewsFrom(__DIR__.'/resources/views', 'widgetforms');
+        $this->loadViewsFrom(__DIR__.'/resources/views', 'moduleforms');
     }
 
     /**
-     * Publica las migraciones del widget
+     * Publica las migraciones del modulo
      */
     private function publishMigrationsAndSeeds() {
         $this->publishes([
@@ -50,11 +50,11 @@ class FormsModuleServiceProvider extends ServiceProvider{
     }
 
     /**
-     * Publica los assets del widget
+     * Publica los assets del modulo
      */
     private function publishAssets(){
         $this->publishes([
-            __DIR__ . '/public/' => public_path('widgets/forms')
+            __DIR__ . '/public/' => public_path('modules/forms')
         ], 'assets');
     }
 }
