@@ -28,7 +28,8 @@ class FormsModuleServiceProvider extends ServiceProvider{
      * Registra las rutas del modulo
      */
     private function registerRoutes() {
-        Route::group(['middleware' => 'auth', 'prefix' => 'backend', 'namespace' => 'Asimov\Solaria\Modules\Forms\Http\Controllers'], function() {
+        Route::group(['middleware' => 'auth', 'namespace' => 'Asimov\Solaria\Modules\Forms\Http\Controllers'], function() {
+            Route::controller('/backend/modules/forms', 'FormsController');
             Route::controller('/modules/forms', 'FormsController');
         });
     }
