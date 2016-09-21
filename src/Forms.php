@@ -1,7 +1,7 @@
 <?php
 namespace Asimov\Solaria\Modules\Forms;
 
-use Asimov\Solaria\Modules\Forms\Models\Form;
+use Auth;
 use Solaria\Modules\SolariaModule;
 
 class Forms implements SolariaModule {
@@ -19,48 +19,37 @@ class Forms implements SolariaModule {
     }
 
     public function getBackendMenuUrl() {
-        return url('backend/modules/forms');
+        if(Auth::user()->can('module_forms_manage_forms'))
+            return url('backend/modules/forms');
+        if(Auth::user()->can('module_forms_view_results'))
+            return url('backend/modules/forms/results');
     }
 
     public function getBackendStyles() {
-        return [asset('modules/forms/css/forms-module.css')];
+        return [asset_versioned('modules/forms/css/forms-module.css')];
     }
 
     public function getFrontendStyles() {
-        // TODO: Implement getFrontendStyles() method.
+        return [asset_versioned('vendor/blueimp-file-upload/css/jquery.fileupload.css')];
     }
 
     public function getBackendScripts() {
-        return [asset('modules/forms/js/forms-module.js')];
+        return [asset_versioned('modules/forms/js/forms-module.js')];
     }
 
     public function getFrontendScripts() {
-        // TODO: Implement getFrontendScripts() method.
+        return [
+            asset_versioned('vendor/blueimp-file-upload/js/vendor/jquery.ui.widget.js'),
+            asset_versioned('vendor/blueimp-file-upload/js/jquery.fileupload.js'),
+            asset_versioned('modules/forms/js/public-forms-module.js')
+        ];
     }
 
     public function getCustomFields() {
         // TODO: Implement getCustomFields() method.
     }
 
-    public function render($form_alias){
-        $fields_views = [];
-
-        /** @var Form $form */
-        $form = Form::where('alias', $form_alias)->first();
-
-        if(!$form)
-            return '';
-
-        foreach ($form->fields as $field) {
-            $fields_views[] = view('moduleforms::frontend.fields.' . $field->type, ['form' => $form, 'field' => $field]);
-        }
-
-        $view = 'moduleforms::frontend.form';
-        $custom_view = 'moduleforms::' . $form->site->alias . '.' . $form->alias . '.form';
-
-        if(view()->exists($custom_view))
-            $view = $custom_view;
-
-        return view($view, ['fields_views' => $fields_views, 'form' => $form]);
+    public function render($options){
+        return new FormsRenderer($options);
     }
 }

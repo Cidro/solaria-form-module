@@ -3,9 +3,12 @@
 namespace Asimov\Solaria\Modules\Forms\Models;
 
 
+use App;
 use Illuminate\Database\Eloquent\Model;
+use Log;
 use Mail;
 use Solaria\Models\User;
+use Solaria\Models\Twig\Site as TwigSite;
 
 class FormResult extends  Model {
 
@@ -49,6 +52,43 @@ class FormResult extends  Model {
     }
 
     /**
+     * @param $notificationRules
+     */
+    public function notifyUsers($notificationRules){
+        $emails = [];
+        foreach ($notificationRules as $notificationRule) {
+            if($this->matchNotificationRule($notificationRule->fields)){
+                $emails = array_merge($emails, $notificationRule->users);
+            }
+        }
+        $this->sendEmail($emails);
+    }
+
+    /**
+     * @param $rules
+     * @return bool
+     */
+    public function matchNotificationRule($rules){
+        foreach($rules as $rule){
+            if($rule->alias == null && $rule->value == '*')
+                return true;
+
+            if($rule->operation == '='){
+                if(!isset($this->results->{$rule->alias})
+                    || !in_array($rule->value, [$this->results->{$rule->alias}, '*']))
+                    return false;
+            }
+
+            if($rule->operation == '!='){
+                if(!isset($this->results->{$rule->alias})
+                    || in_array($rule->value, [$this->results->{$rule->alias}, '*']))
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * @param string $to
      * @param string $template
      */
@@ -58,15 +98,55 @@ class FormResult extends  Model {
         $fields = [];
 
         foreach ($form->fields as $field){
-            if(isset($this->results->{$field->alias}))
-                $fields[$field->alias] = ['name' => $field->name, 'value' => $this->results->{$field->alias}];
+            if(isset($this->results->{$field->alias})){
+                if(gettype($this->results->{$field->alias}) == 'array' && !($field->type == 'hidden' && object_get($field->config, 'dataType', '') == 'json'))
+                    $value = implode(',', $this->results->{$field->alias});
+                else
+                    $value = $this->results->{$field->alias};
+
+                $fields[$field->alias] = [
+                    'name' => $field->name,
+                    'alias' => $field->alias,
+                    'value' => $value,
+                    'options' => $field->getOptions()
+                ];
+            }
         }
 
+        view()->share([
+            'site' => new TwigSite(App::make('site')),
+        ]);
+
+        $subject = $this->getSubject($template);
         $mail_view = 'moduleforms::' . $site->alias . '.' . $form->alias . '.emails.' . $template;
-        $mail_data = ['site' => $site, 'form' => $form, 'fields' => $fields];
-        Mail::send($mail_view, $mail_data, function($message) use ($form, $to){
-            $message->to($to);
-        });
+        $mail_data = ['form' => $form, 'fields' => $fields];
+        try {
+            Mail::send($mail_view, $mail_data, function($message) use ($form, $to, $subject){
+                $message->subject($subject);
+                $message->from(env('MAIL_FROM'), env('MAIL_FROMNAME'));
+                $message->to($to);
+            });
+        } catch (\Exception $e ){
+            Log::error($e->getMessage());
+        }
     }
+
+    /**
+     * @param $template
+     * @return string
+     */
+    protected function getSubject($template){
+        $alias = str_slug($this->form->alias, '_');
+        return lang('module_forms.subject_' . $template . '_' . $alias);
+    }
+
+    public function save(array $options = []) {
+        if(!$this->exists){
+            $this->ip = request()->ip();
+            $this->user_agent = request()->server('HTTP_USER_AGENT');
+        }
+        return parent::save($options);
+    }
+
 
 }

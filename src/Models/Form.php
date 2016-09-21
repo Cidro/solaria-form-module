@@ -1,9 +1,11 @@
 <?php
 namespace Asimov\Solaria\Modules\Forms\Models;
 
+use Carbon\Carbon;
 use DB;
 use Illuminate\Database\Eloquent\Model;
 use Log;
+use Solaria\Models\User;
 use Storage;
 
 
@@ -52,6 +54,28 @@ class Form extends Model {
     }
 
     /**
+     * @param $user
+     */
+    public function resultsForUser($user){
+        if($user->can('module_forms_assign_user_results', null)){
+            return $this->results()
+                ->with('user')
+                ->orderBy('created_at', 'desc')
+                ->where('created_at', '>=' ,Carbon::parse(request()->input('date-from'))->startOfDay())
+                ->where('created_at', '<=' ,Carbon::parse(request()->input('date-to'))->endOfDay())
+                ->get();
+        } else {
+            return $this->results()
+                ->with('user')
+                ->where('assigned_user_id', $user->id)
+                ->where('created_at', '>=' ,Carbon::parse(request()->input('date-from'))->startOfDay())
+                ->where('created_at', '<=' ,Carbon::parse(request()->input('date-to'))->endOfDay())
+                ->orderBy('created_at', 'desc')
+                ->get();
+        }
+    }
+
+    /**
      * Guarda el nombre anterior del layout en caso de que se cambie
      * @param $alias
      */
@@ -65,7 +89,11 @@ class Form extends Model {
      * @return string
      */
     public function getClientEmailTemplateAttribute(){
-        return Storage::drive('vendor_views')->get($this->getEmailTemplateFolderName() . '/client.' . config('twigbridge.twig.extension', 'twig'));
+        try {
+            return Storage::drive('vendor_views')->get($this->getEmailTemplateFolderName() . '/client.' . config('twigbridge.twig.extension', 'twig'));
+        } catch(\Exception $e) {
+            return '';
+        }
     }
 
     /**
@@ -73,7 +101,19 @@ class Form extends Model {
      * @return string
      */
     public function getUserEmailTemplateAttribute(){
-        return Storage::drive('vendor_views')->get($this->getEmailTemplateFolderName() . '/user.' . config('twigbridge.twig.extension', 'twig'));
+        try {
+            return Storage::drive('vendor_views')->get($this->getEmailTemplateFolderName() . '/user.' . config('twigbridge.twig.extension', 'twig'));
+        } catch(\Exception $e) {
+            return '';
+        }
+    }
+
+    /**
+     * @param bool $old
+     * @return string
+     */
+    public function getTemplateFolderName($old = false){
+        return '/moduleforms/' . $this->site->alias . '/' . ($old ? $this->old_alias : $this->alias);
     }
 
     /**
@@ -82,7 +122,19 @@ class Form extends Model {
      * @return string
      */
     public function getEmailTemplateFolderName($old = false){
-        return '/moduleforms/' . $this->site->alias . '/' . ($old ? $this->old_alias : $this->alias) . '/emails';
+        return $this->getTemplateFolderName($old) . '/emails';
+    }
+
+    /**
+     * @param $field_alias
+     * @return null
+     */
+    public function getField($field_alias){
+        foreach ($this->fields as $field) {
+            if($field_alias == $field->alias)
+                return $field;
+        }
+        return new FormField();
     }
 
     /**
@@ -90,23 +142,22 @@ class Form extends Model {
      * @param $fieldsConfig
      */
     public function updateFormFields($fieldsConfig){
-        DB::beginTransaction();
-        try {
-            $this->fields()->delete();
-            foreach ($fieldsConfig as $fieldConfig) {
+        $savedFieldsIds = [];
+        foreach ($fieldsConfig as $fieldConfig) {
+            if(array_get($fieldConfig, 'id', null)){
+                $field = FormField::find(array_get($fieldConfig, 'id', null));
+            } else {
                 $field = new FormField();
-                $field->form_id = $this->id;
-                $field->name = array_get($fieldConfig, 'name', '');
-                $field->alias = array_get($fieldConfig, 'alias', '');
-                $field->type = array_get($fieldConfig, 'type.type', '');
-                $field->config = array_get($fieldConfig,'config', null);
-                $field->save();
             }
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error($e->getMessage());
+            $field->form_id = $this->id;
+            $field->name = array_get($fieldConfig, 'name', '');
+            $field->alias = array_get($fieldConfig, 'alias', '');
+            $field->type = array_get($fieldConfig, 'type.type', '');
+            $field->config = array_get($fieldConfig,'config', null);
+            $field->save();
+            $savedFieldsIds[] = $field->id;
         }
-        DB::commit();
+        $this->fields()->whereNotIn('id', $savedFieldsIds)->delete();
     }
 
     /**
@@ -125,9 +176,10 @@ class Form extends Model {
         Storage::drive('vendor_views')->put($this->getEmailTemplateFolderName() . '/' . $user_email_template_filename , $this->user_email_template);
 
         try {
-            chmod(config('filesystems.disks.vendor_views.root') . '/' . $this->getEmailTemplateFolderName(), 0775);
-            chmod(config('filesystems.disks.vendor_views.root') . '/' . $this->getEmailTemplateFolderName() . '/' . $client_email_template_filename, 0644);
-            chmod(config('filesystems.disks.vendor_views.root') . '/' . $this->getEmailTemplateFolderName() . '/' . $user_email_template_filename, 0644);
+            chmod(config('filesystems.disks.vendor_views.root') . $this->getTemplateFolderName(), 0775);
+            chmod(config('filesystems.disks.vendor_views.root') . $this->getEmailTemplateFolderName(), 0775);
+            chmod(config('filesystems.disks.vendor_views.root') . $this->getEmailTemplateFolderName() . '/' . $client_email_template_filename, 0664);
+            chmod(config('filesystems.disks.vendor_views.root') . $this->getEmailTemplateFolderName() . '/' . $user_email_template_filename, 0664);
         } catch (\Exception $e) {
             Log::error($e->getMessage());
         }
