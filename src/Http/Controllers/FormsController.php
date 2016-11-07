@@ -8,6 +8,8 @@ use Asimov\Solaria\Modules\Forms\Models\FormResult;
 use Auth;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Maatwebsite\Excel\Classes\LaravelExcelWorksheet;
 use Maatwebsite\Excel\Facades\Excel;
 use PHPExcel;
 use PHPExcel_IOFactory;
@@ -205,16 +207,21 @@ class FormsController extends BackendController {
 
         Excel::create('resultados', function($excel) use($data){
             $excel->getDefaultStyle()->getAlignment()->setWrapText(true);
-            $excel->sheet('Hoja 1', function($sheet) use ($data) {
+            $excel->sheet('Hoja 1', function(LaravelExcelWorksheet $sheet) use ($data) {
                 $contents = [];
-
-                foreach ($data['results'] as $result) {
+                foreach ($data['results'] as $key => $result) {
                     $row = [];
                     foreach ($data['headers'] as $header) {
                         if($header->type == 'hidden' && object_get($header->config, 'dataType') == 'json'){
                             $row[$header->name] = json_encode(object_get($result->results, $header->alias), JSON_UNESCAPED_UNICODE);
                         } else {
                             $row[$header->name] = $this->remove_emoji(object_get($result->results, $header->alias));
+                        }
+                        if(gettype($row[$header->name]) === 'array'){
+                            $row[$header->name] = implode(',', $row[$header->name]);
+                        }
+                        if(substr($row[$header->name], 0, 1) === '='){
+                            $row[$header->name] = ' ' . $row[$header->name];
                         }
                     }
                     $row['Fecha'] = $result->created_at->addMinutes($data['tzoffset']);
