@@ -15,7 +15,7 @@ class AddModuleFormConnectorsTable extends Migration
         Schema::create('module_form_connectors', function (Blueprint $table) {
             $table->increments('id');
             $table->integer('site_id')->unsigned();
-            $table->integer('form_id')->unsigned()->nullable();
+            $table->integer('form_id')->unsigned();
             $table->string('content_type', 255);
             $table->string('event', 64)->default('post-save');
             $table->timestamps();

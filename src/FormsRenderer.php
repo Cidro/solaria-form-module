@@ -21,6 +21,11 @@ class FormsRenderer {
     protected $isAjax = false;
 
     /**
+     * @var mixed|null
+     */
+    protected $successRedirect = null;
+
+    /**
      * @var Site
      */
     protected $site;
@@ -39,7 +44,13 @@ class FormsRenderer {
 
         if (gettype($options) == 'array') {
             $this->form_alias = array_get($options, 0, '');
-            $this->isAjax = array_get($options, 1, false);
+            $params = array_get($options, 1, false);
+            if(gettype($params) == 'boolean') {
+                $this->isAjax = $params;
+            } elseif(gettype($params) == 'array') {
+                $this->isAjax = array_get($params, 'is_ajas', false);
+                $this->successRedirect = array_get($params, 'success_redirect', null);
+            }
         } else {
             $this->form_alias = $options;
         }
@@ -62,11 +73,13 @@ class FormsRenderer {
 
     function __toString() {
         $fieldsViews = [];
+        $fieldsData = [];
 
         if (!$this->form)
             return '';
 
         foreach ($this->form->fields as $field) {
+            $fieldsData[$field->alias] = $field;
             $fieldsViews[$field->alias] = view('moduleforms::frontend.fields.' . $field->type, ['form' => $this->form, 'field' => $field]);
         }
 
@@ -78,7 +91,7 @@ class FormsRenderer {
 
         $successView = view('moduleforms::frontend.partials.success', ['success' => Session::get('success', null)]);
         $openView = view('moduleforms::frontend.partials.open', ['form' => $this->form, 'isAjax' => $this->isAjax, 'attr' => $attributes]);
-        $closeView = view('moduleforms::frontend.partials.close', ['form' => $this->form, 'site' => $this->site]);
+        $closeView = view('moduleforms::frontend.partials.close', ['form' => $this->form, 'site' => $this->site, 'showButton' => true]);
 
         $formView = 'moduleforms::frontend.form';
         $customFormView = 'moduleforms::' . $this->form->site->alias . '.' . $this->form->alias . '.form';
@@ -91,6 +104,7 @@ class FormsRenderer {
             'close_view' => $closeView,
             'success_view' => $successView,
             'fields_views' => $fieldsViews,
+            'fields_data' => $fieldsData,
             'was_sent' => Session::has('success'),
             'form' => $this->form,
             'site' => $this->site,
@@ -100,14 +114,14 @@ class FormsRenderer {
 
     private function getTwigForm() {
         $form = FormModel::where(['alias' => $this->form_alias, 'site_id' => $this->site->id])->first();
-        return new FormTwig($form, $this->site, $this->isAjax);
+        return new FormTwig($form, $this->site, $this->isAjax, $this->successRedirect);
     }
 
     private function getSuccessMessage() {
-        $scucess = session('success', '');
-        if (is_array($scucess)) {
-            $scucess = array_get($scucess, 0);
+        $success = session('success', '');
+        if (is_array($success)) {
+            $success = '</div>' . implode('</div><div>', $success) . '</div>';
         }
-        return $scucess;
+        return $success;
     }
 }

@@ -4,6 +4,7 @@ namespace Asimov\Solaria\Modules\Forms\Models;
 
 
 use App;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Log;
 use Mail;
@@ -64,6 +65,39 @@ class FormResult extends  Model {
         $this->sendEmail($emails);
     }
 
+    protected function getDayOfWeekParams($rule) {
+        return explode(',', substr(trim(str_replace('dow(', '',$rule->value)), 0, -1));
+    }
+
+    protected function getMinutesFromStartOfWeek($dayOfWeek, $time) {
+        list($hours, $minutes) = explode(':', $time);
+        return (intval($dayOfWeek) * 1440) + (intval($hours) * 60) + (intval($minutes)) ;
+    }
+
+    protected function getRuleValue($rule) {
+        if(substr($rule->value, 0, 3) == 'dow') {
+            $params = $this->getDayOfWeekParams($rule);
+            return $this->getMinutesFromStartOfWeek(intval(array_get($params, 0, 1) - 1), array_get($params, 1, '00:00'));
+        }
+        return $rule->value;
+    }
+
+    protected function getRuleResultValue($rule, $results) {
+        if($rule->alias == 'sendDate') {
+            $date = Carbon::now();
+            if(substr($rule->value, 0, 3) == 'dow') {
+                return $this->getMinutesFromStartOfWeek($date->dayOfWeek, $date->format('H:i'));
+            }
+            return $date;
+        }
+
+        if(isset($results->{$rule->alias})) {
+            return $results->{$rule->alias};
+        }
+
+        return null;
+    }
+
     /**
      * @param $rules
      * @return bool
@@ -73,16 +107,38 @@ class FormResult extends  Model {
             if($rule->alias == null && $rule->value == '*')
                 return true;
 
-            if($rule->operation == '='){
-                if(!isset($this->results->{$rule->alias})
-                    || !in_array($rule->value, [$this->results->{$rule->alias}, '*']))
-                    return false;
+            if ($rule->alias != 'sendDate' && !isset($this->results->{$rule->alias})) {
+                return false;
             }
 
-            if($rule->operation == '!='){
-                if(!isset($this->results->{$rule->alias})
-                    || in_array($rule->value, [$this->results->{$rule->alias}, '*']))
-                    return false;
+            $ruleValue = $this->getRuleValue($rule);
+            $resultValue = $this->getRuleResultValue($rule, $this->results);
+
+
+            if($ruleValue != '*') {
+                if($rule->operation == '='){
+                    if($ruleValue != $resultValue) {
+                        return false;
+                    }
+                }
+
+                if($rule->operation == '!='){
+                    if($ruleValue == $resultValue) {
+                        return false;
+                    }
+                }
+
+                if($rule->operation == '>'){
+                    if($ruleValue >= $resultValue) {
+                        return false;
+                    }
+                }
+
+                if($rule->operation == '<') {
+                    if($ruleValue <= $resultValue) {
+                        return false;
+                    }
+                }
             }
         }
         return true;
@@ -96,6 +152,8 @@ class FormResult extends  Model {
         $form = $this->form;
         $site = $this->form->site;
         $fields = [];
+        $fieldAttachments = object_get($form, 'config.' . $template . '_email_attachments', []);
+        $attachments = [];
 
         foreach ($form->fields as $field){
             if(isset($this->results->{$field->alias})){
@@ -110,6 +168,9 @@ class FormResult extends  Model {
                     'value' => $value,
                     'options' => $field->getOptions()
                 ];
+                if($field->type == 'file' && in_array($field->alias, $fieldAttachments)) {
+                    $attachments[] = config('filesystems.disks.modules.root') . '/moduleforms/' . $value;
+                }
             }
         }
 
@@ -119,12 +180,15 @@ class FormResult extends  Model {
 
         $subject = $this->getSubject($template);
         $mail_view = 'moduleforms::' . $site->alias . '.' . $form->alias . '.emails.' . $template;
-        $mail_data = ['form' => $form, 'fields' => $fields];
+        $mail_data = ['form' => $form, 'fields' => $fields, 'recordId' => $this->id];
         try {
-            Mail::send($mail_view, $mail_data, function($message) use ($form, $to, $subject){
+            Mail::send($mail_view, $mail_data, function($message) use ($form, $to, $subject, $attachments){
                 $message->subject($subject);
                 $message->from(env('MAIL_FROM'), env('MAIL_FROMNAME'));
                 $message->to($to);
+                foreach ($attachments as $attachment) {
+                    $message->attach($attachment);
+                }
             });
         } catch (\Exception $e ){
             Log::error($e->getMessage());

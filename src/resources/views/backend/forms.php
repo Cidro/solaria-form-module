@@ -18,7 +18,7 @@
                 <button type="button" class="btn btn-xs btn-danger pull-right" ng-click="removeForm($index)">
                     <span class="glyphicon glyphicon-trash"></span>
                 </button>
-                {{ form.name }}
+                <span class="label label-default">{{ form.id }}</span> {{ form.name }}
             </a>
         </div>
     </div>
@@ -84,14 +84,22 @@
                                                             <div class="row" ng-repeat="ruleField in assignmentRule.fields track by $index">
                                                                 <div class="col-sm-12">
                                                                     <div class="input-group">
-                                                                        <select class="form-control" ng-options="f.alias as f.name for f in form.fields" ng-model="ruleField.alias">
-                                                                            <option value="">Cualquier campo</option>
+                                                                        <select class="form-control" ng-model="ruleField.alias">
+                                                                            <optgroup label="Filtros Globales">
+                                                                                <option value="sendDate">Fecha de Envío</option>
+                                                                            </optgroup>
+                                                                            <optgroup label="Filtros de Campos">
+                                                                                <option value="">Cualquier campo</option>
+                                                                                <option ng-repeat="field in form.fields" value="{{ field.alias }}">{{ field.name }}</option>
+                                                                            </optgroup>
                                                                         </select>
                                                                         <div class="input-group-btn">
                                                                             <button type="button" class="btn dropdown-toggle" ng-class="{'btn-success': ruleField.operation == '=', 'btn-warning': ruleField.operation == '!='}" data-toggle="dropdown"><strong>{{ ruleField.operation }}</strong></button>
                                                                             <ul class="dropdown-menu">
                                                                                 <li><a href="#" ng-click="changeRuleOperation($event, ruleField, '=')">Igual</a></li>
                                                                                 <li><a href="#" ng-click="changeRuleOperation($event, ruleField, '!=')">Distinto</a></li>
+                                                                                <li><a href="#" ng-click="changeRuleOperation($event, ruleField, '>')">Mayor</a></li>
+                                                                                <li><a href="#" ng-click="changeRuleOperation($event, ruleField, '<')">Menor</a></li>
                                                                             </ul>
                                                                         </div>
                                                                         <input type="text" class="form-control" ng-model="ruleField.value">
@@ -204,9 +212,27 @@
                                 </ul>
                                 <div class="tab-content">
                                     <div class="tab-pane active" id="form-template-user">
+                                        <div class="form-group">
+                                            <label>Adjuntar archivos</label>
+                                            <div>
+                                                <label class="checkbox-inline" ng-repeat="field in form.fields | filter: fileFilter track by $index">
+                                                    <input type="checkbox" name="user_email_attachments[]" ng-click="toggleAttachment(field, 'user')" value="{{ field.alias }}" ng-checked="form.config.user_email_attachments.indexOf(field.alias) > -1"> {{ field.name }}
+                                                </label>
+                                            </div>
+                                            <hr>
+                                        </div>
                                         <div ui-ace="{mode:'twig', theme:'monokai'}" ng-model="form.user_email_template"></div>
                                     </div>
                                     <div class="tab-pane" id="form-template-client">
+                                        <div class="form-group">
+                                            <label for="user-attachments">Adjuntar archivos</label>
+                                            <div>
+                                                <label class="checkbox-inline" ng-repeat="field in form.fields | filter: fileFilter track by $index">
+                                                    <input type="checkbox" name="user_email_attachments[]" ng-click="toggleAttachment(field, 'client')" value="{{ field.alias }}" ng-checked="form.config.client_email_attachments.indexOf(field.alias) > -1"> {{ field.name }}
+                                                </label>
+                                            </div>
+                                            <hr>
+                                        </div>
                                         <div ui-ace="{mode:'twig', theme:'monokai'}" ng-model="form.client_email_template"></div>
                                     </div>
                                 </div>

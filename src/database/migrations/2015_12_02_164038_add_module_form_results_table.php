@@ -16,6 +16,8 @@ class AddModuleFormResultsTable extends Migration
             $table->increments('id');
             $table->integer('form_id')->unsigned()->nullable();
             $table->integer('assigned_user_id')->unsigned()->nullable();
+            $table->string('user_agent', 512)->after('assigned_user_id')->nullable();
+            $table->string('ip', 64)->after('assigned_user_id')->nullable();
             $table->text('results');
             $table->timestamps();
         });

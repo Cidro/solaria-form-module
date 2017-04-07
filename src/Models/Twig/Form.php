@@ -19,6 +19,11 @@ class Form {
     protected $isAjax;
 
     /**
+     * @var mixed
+     */
+    protected $successRedirect;
+
+    /**
      * @var Site
      */
     protected $site;
@@ -28,11 +33,13 @@ class Form {
      * @param FormModel $form
      * @param Site $site
      * @param bool $isAjax
+     * @param null $successRedirect
      */
-    public function __construct(FormModel $form, Site $site, $isAjax = false) {
+    public function __construct(FormModel $form, Site $site, $isAjax = false, $successRedirect = null) {
         $this->form = $form;
         $this->site = $site;
         $this->isAjax = $isAjax;
+        $this->successRedirect = $successRedirect;
     }
 
     function __get($name) {
@@ -47,6 +54,8 @@ class Form {
                 return $this->closeForm();
             case 'fields':
                 return $this->getFields();
+            case 'fieldsData':
+                return $this->getFieldsData();
         }
         return null;
     }
@@ -55,18 +64,19 @@ class Form {
         switch ($name) {
             case 'open':
                 return $this->openForm($arguments);
+            case 'close':
+                return $this->closeForm($arguments);
         }
     }
-
 
     function __isset($name) {
         if(!$this->form)
             return false;
-        return in_array($name, ['open', 'close', 'fields', 'success']);
+        return in_array($name, ['open', 'close', 'wasSent', 'success', 'fields', 'fieldsData']);
     }
 
     private function openForm($options = null){
-        $options = array_get($options, 0);
+        $options = array_get($options, 0, []);
 
         $attributes = [
             'class' => 'solaria-form form-' . $this->form->alias . ' ' . array_get($options, 'class', ''),
@@ -90,8 +100,10 @@ class Form {
         ]);
     }
 
-    private function closeForm(){
-        return view('moduleforms::frontend.partials.close', ['form' => $this->form, 'site' => $this->site]);
+    private function closeForm($options = []){
+        $options = array_get($options, 0, []);
+        $showButton = array_get($options, 'showButton', true);
+        return view('moduleforms::frontend.partials.close', ['form' => $this->form, 'site' => $this->site, 'showButton' => $showButton, 'successRedirect' => $this->successRedirect]);
     }
 
     private function successMessage() {
@@ -104,5 +116,14 @@ class Form {
             $fieldsViews[$field->alias] = view('moduleforms::frontend.fields.' . $field->type, ['form' => $this->form, 'field' => $field]);
         }
         return $fieldsViews;
+    }
+
+    private function getFieldsData() {
+        $fields = $this->form->fields;
+        $fieldsArray = [];
+        foreach ($fields as $field) {
+            $fieldsArray[$field['alias']] = new FormField($field);
+        }
+        return $fieldsArray;
     }
 }

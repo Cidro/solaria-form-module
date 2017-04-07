@@ -12,7 +12,6 @@ use Solaria\Models\Page;
 use Storage;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Validator;
-use Event;
 
 class PublicFormsController extends FrontendController {
 
@@ -22,7 +21,6 @@ class PublicFormsController extends FrontendController {
      * @return \Illuminate\Http\RedirectResponse
      */
     public function postProcessForm(Request $request) {
-        $success_message = [];
         $language = Language::find($request->input('language_id', null));
 
         if (!$language)
@@ -33,31 +31,7 @@ class PublicFormsController extends FrontendController {
 
         /** @var Form $form */
         $form = Form::find($request->input('form_id'));
-
-        $form_results = new FormResult();
-        $form_results->form_id = $form->id;
-        $form_results->assigned_user_id = $form->user->id;
-        $results = $validations = $niceNames = [];
-
-        foreach ($form->fields as $field) {
-            if ($field->type == 'file') {
-                $results[$field->alias] = $request->input('hidden-field-' . $field->alias, '');
-            } elseif ($field->type == 'hidden' && (object_get($field->config, 'dataType') == 'json')) {
-                $jsonValue = $request->input('field-' . $field->alias, '');
-                if (gettype($jsonValue) == 'string')
-                    $jsonValue = json_decode($jsonValue) ?: $jsonValue;
-                $results[$field->alias] = $jsonValue;
-            } else {
-                $results[$field->alias] = $request->input('field-' . $field->alias, '');
-                $validations[$field->alias] = $field->getValidations();
-            }
-        }
-
-        $validator = Validator::make($results, $validations);
-        foreach ($validator->errors()->toArray() as $fieldName => $error) {
-            $niceNames[$fieldName] = lang('module_forms.' . $fieldName, $this->getDefaultFieldName($form->fields, $fieldName));
-        }
-        $validator->setAttributeNames($niceNames);
+        $validator = $form->validate($request);
 
         if ($validator->fails()) {
             if ($request->ajax()) {
@@ -69,53 +43,25 @@ class PublicFormsController extends FrontendController {
             }
         }
 
-        $form_results->results = $results;
-        $form_results->save();
-
-        Event::fire('moduleforms.pre-send', ['form_results' => $form_results]);
-        if (App::bound('moduleforms:pre-send:messages'))
-            $customMessage = App::make('moduleforms:pre-send:messages');
+        $formResults = $form->saveResults($validator->getData());
+        $customMessage = $form->triggerEvent('pre-send', $formResults);
 
         //Se recargan los resultados en caso de que fueran modificados por algun evento
-        $form_results = FormResult::find($form_results->id);
+        $formResults = FormResult::find($formResults->id);
 
-        if ($form->user) {
-            $form_results->assign($form->user);
-        }
+        $form->sendNotifications($formResults);
+        $successMessage = $form->prepareMessage($request, $customMessage);
 
-        if (isset($form->config->assignmentRules)) {
-            $form_results->notifyUsers($form->config->assignmentRules);
-        }
-
-        if (object_get($form, 'config.client_email_field', null)) {
-            $form_results->notifyClient($form->config->client_email_field);
-        }
-
-        //Se actualizan los resultados con la información de los usuarios
-        $form_results->save();
-
-        $success_message[] = isset($form->config->success_message) ? $form->config->success_message : 'Success';
-
-        if ($request->session()->has('moduleforms.post-save')) {
-            $success_message[] = $request->session()->get('moduleforms.post-save');
-        }
-
-        if (isset($customMessage))
-            $success_message[] = $customMessage;
-
-        if (count($success_message) == 0)
-            $success_message = $success_message[0];
-
+        $redirectTo = $this->getSuccessRedirect($form->config, $request);
         if ($request->ajax()) {
-            return response()->json(['success' => true, 'message' => $success_message, 'errors' => []]);
-        } else {
-            if ($redirectPageId = object_get($form->config, 'success_redirect', null)) {
-                $page = Page::find($redirectPageId);
-                $redirectTo = $page->getUrl();
+            if($redirectTo) {
+                $request->session()->flash('success', $successMessage);
+                return response()->json(['success' => true, 'message' => $successMessage, 'errors' => [], 'redirect' => $redirectTo]);
             } else {
-                $redirectTo = $request->header('referer');
+                return response()->json(['success' => true, 'message' => $successMessage, 'errors' => []]);
             }
-            return response()->redirectTo($redirectTo)->with('success', $success_message);
+        } else {
+            return response()->redirectTo($redirectTo)->with('success', $successMessage);
         }
     }
 
@@ -160,13 +106,6 @@ class PublicFormsController extends FrontendController {
         return response()->json(['files' => array_values($response)]);
     }
 
-    protected function getDefaultFieldName($fields, $fieldName) {
-        foreach ($fields as $field) {
-            if ($field->alias == $fieldName)
-                return $field->name;
-        }
-    }
-
     /**
      * @param UploadedFile $file
      * @param $count
@@ -176,5 +115,30 @@ class PublicFormsController extends FrontendController {
         $extension = '.' . $file->getClientOriginalExtension();
         $fileName = rtrim($file->getClientOriginalName(), $extension);
         return $fileName . ' (' . $count . ')' . $extension;
+    }
+
+    /**
+     * @param $formConfig
+     * @param $request
+     * @return string
+     */
+    protected function getSuccessRedirect($formConfig, Request $request) {
+        $redirectTo = $request->header('referer');
+
+        if($customSuccessRedirect = $request->input('success_redirect', null)){
+            if(is_numeric($customSuccessRedirect)) {
+                $page = Page::find($customSuccessRedirect);
+                $redirectTo = $page->getUrl();
+            } else {
+                $redirectTo = $customSuccessRedirect;
+            }
+        } else {
+            if ($redirectPageId = object_get($formConfig, 'success_redirect', null)) {
+                $page = Page::find($redirectPageId);
+                $redirectTo = $page->getUrl();
+            }
+        }
+
+        return $redirectTo;
     }
 }

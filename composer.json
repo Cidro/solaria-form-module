@@ -9,9 +9,7 @@
             "email": "pablo@asimov.cl"
         }
     ],
-    "require": {
-        "maatwebsite/excel": "2.1.3"
-    },
+    "require": {},
     "require-dev": {
         "laravel/framework": "5.1.*"
     },

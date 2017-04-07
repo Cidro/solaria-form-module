@@ -1,12 +1,13 @@
 <?php
 namespace Asimov\Solaria\Modules\Forms\Models;
 
+use App;
 use Carbon\Carbon;
-use DB;
+use Event;
 use Illuminate\Database\Eloquent\Model;
 use Log;
-use Solaria\Models\User;
 use Storage;
+use Validator;
 
 
 class Form extends Model {
@@ -187,5 +188,115 @@ class Form extends Model {
         return parent::save($options);
     }
 
+    /**
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Validation\Validator
+     */
+    public function validate($request){
+        $results = $validations = $niceNames = [];
+        foreach ($this->fields as $field) {
+            /** @var FormField $field */
+            if ($field->type == 'file') {
+                $results[$field->alias] = $request->input('hidden-field-' . $field->alias, '');
+                $validations[$field->alias] = $field->getValidations();
+            } elseif ($field->type == 'hidden' && (object_get($field->config, 'dataType') == 'json')) {
+                $jsonValue = $request->input('field-' . $field->alias, '');
+                if (gettype($jsonValue) == 'string')
+                    $jsonValue = json_decode($jsonValue) ?: $jsonValue;
+                $results[$field->alias] = $jsonValue;
+            } else {
+                $results[$field->alias] = $request->input('field-' . $field->alias, '');
+                $validations[$field->alias] = $field->getValidations();
+            }
+        }
 
+        $validator = Validator::make($results, $validations);
+        foreach ($validator->errors()->toArray() as $fieldName => $error) {
+            $niceNames[$fieldName] = lang('module_forms.' . $fieldName, $this->getDefaultFieldName($this->fields, $fieldName));
+        }
+        $validator->setAttributeNames($niceNames);
+
+        return $validator;
+    }
+
+    /**
+     * @param $fields
+     * @param $fieldName
+     * @return mixed
+     */
+    protected function getDefaultFieldName($fields, $fieldName) {
+        foreach ($fields as $field) {
+            if ($field->alias == $fieldName)
+                return $field->name;
+        }
+    }
+
+    /**
+     * @param array $results
+     * @return FormResult
+     */
+    public function saveResults($results) {
+        $form_results = new FormResult();
+        $form_results->form_id = $this->id;
+        $form_results->assigned_user_id = $this->user->id;
+        $form_results->results = $results;
+        $form_results->save();
+        return $form_results;
+    }
+
+    /**
+     * @param string $eventName
+     * @param FormResult $formResults
+     * @return mixed|null
+     */
+    public function triggerEvent($eventName, $formResults) {
+        Event::fire('moduleforms.' . $eventName, ['form_results' => $formResults]);
+
+        if (App::bound('moduleforms:pre-send:messages'))
+            return App::make('moduleforms:pre-send:messages');
+
+        return null;
+    }
+
+    /**
+     * @param FormResult $formResults
+     * @return mixed
+     */
+    public function sendNotifications($formResults) {
+        if ($this->user) {
+            $formResults->assign($this->user);
+        }
+
+        if (isset($this->config->assignmentRules)) {
+            $formResults->notifyUsers($this->config->assignmentRules);
+        }
+
+        if (object_get($this, 'config.client_email_field', null)) {
+            $formResults->notifyClient($this->config->client_email_field);
+        }
+
+        //Se actualizan los resultados con la información de los usuarios
+        $formResults->save();
+    }
+
+    /**
+     * @param \Illuminate\Http\Request $request
+     * @param string $customMessage
+     * @return array
+     */
+    public function prepareMessage($request, $customMessage) {
+        $successMessage[] = isset($this->config->success_message) ? $this->config->success_message : 'Success';
+
+        if ($request->session()->has('moduleforms.post-save')) {
+            $successMessage[] = $request->session()->get('moduleforms.post-save');
+        }
+
+        if (isset($customMessage))
+            $successMessage[] = $customMessage;
+
+        if (count($successMessage) == 0)
+            $successMessage = $successMessage[0];
+
+        return $successMessage;
+    }
 }

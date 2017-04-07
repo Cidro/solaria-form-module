@@ -71,7 +71,7 @@ class FormField extends  Model {
      * @return string
      */
     public function getValidations(){
-        return isset($this->config->validations) ? $this->config->validations : '';
+        return object_get($this, 'config.validations', '');
     }
 
     /**
@@ -91,6 +91,13 @@ class FormField extends  Model {
             if(object_get($attributes, 'readonly')){
                 $result[] = 'readonly="' . object_get($attributes, 'readonly') . '"';
             }
+        }
+        if($maxLength = object_get($this->config, 'maxLength')) {
+            $result[] = 'maxlength=' . $maxLength;
+        }
+        $validationsRules = explode('|', $this->getValidations());
+        if(in_array('rut', $validationsRules)) {
+            $result[] = 'data-validation="rut"';
         }
         return implode(' ', $result);
     }

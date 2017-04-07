@@ -54,6 +54,9 @@ class FormsController extends BackendController {
             $form = new Form();
         }
 
+        if($form_id && $redirect = $this->checkSite($form))
+            return response()->json(['errors' => ['Error al grabar. Se ha perdido la sesión de su usuario, pruebe recargando la página.']], 500);
+
         $this->validate($request, [
             'name' => 'required',
             'alias' => 'required',
@@ -225,6 +228,9 @@ class FormsController extends BackendController {
                         }
                     }
                     $row['Fecha'] = $result->created_at->addMinutes($data['tzoffset']);
+                    $row['Ip'] = $result->ip;
+                    $row['User Agent'] = $result->user_agent;
+
                     $contents[] = $row;
                 }
 
