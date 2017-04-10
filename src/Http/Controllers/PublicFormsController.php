@@ -54,7 +54,7 @@ class PublicFormsController extends FrontendController {
 
         $redirectTo = $this->getSuccessRedirect($form->config, $request);
         if ($request->ajax()) {
-            if($redirectTo) {
+            if($redirectTo != $request->header('referer')) {
                 $request->session()->flash('success', $successMessage);
                 return response()->json(['success' => true, 'message' => $successMessage, 'errors' => [], 'redirect' => $redirectTo]);
             } else {
