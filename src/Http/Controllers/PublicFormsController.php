@@ -70,7 +70,7 @@ class PublicFormsController extends FrontendController {
         $files = $response = $validations = $niceNames = [];
 
         foreach ($form->fields as $field) {
-            if ($field->type == 'file') {
+            if ($field->type == 'file' && in_array('field-' . $field->alias, $request->files->keys())) {
                 $files[$field->alias] = $request->file('field-' . $field->alias, '');
                 $validations[$field->alias] = $field->getValidations();
                 $errors = $files[$field->alias]->getError() > 0 ? [$files[$field->alias]->getErrorMessage()] : [];
