@@ -149,40 +149,44 @@
         </div>
         <div class="modal-body">
             <h4 ng-if="result.user">Responsable: {{ result.user.full_name }}</h4>
-            <table class="table table-striped table-bordered">
-                <tbody>
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered">
+                    <tbody>
+                        <tr>
+                            <th>Fecha</th>
+                            <td>{{ result.fecha }}</td>
+                        </tr>
+                        <tr ng-repeat="field in form.fields">
+                            <th width="20%">{{ field.name }}</th>
+                            <td ng-if="field.type == 'file'"><a target="_blank" href="{{ getFileUrl(result[field.alias]) }}">{{ result[field.alias] }}</a></td>
+                            <td ng-if="field.type == 'hidden'">
+                                <div ng-if="field.config.dataType != 'json'">{{ result[field.alias] }}</div>
+                                <pre ng-if="field.config.dataType == 'json'">{{ result[field.alias] | json }}</pre>
+                            </td>
+                            <td ng-if="field.type != 'file' && field.type != 'hidden'">{{ result[field.alias] }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered" ng-if="result.ip">
+                    <thead>
                     <tr>
-                        <th>Fecha</th>
-                        <td>{{ result.fecha }}</td>
+                        <th colspan="2">Auditoría</th>
                     </tr>
-                    <tr ng-repeat="field in form.fields">
-                        <th width="20%">{{ field.name }}</th>
-                        <td ng-if="field.type == 'file'"><a target="_blank" href="{{ getFileUrl(result[field.alias]) }}">{{ result[field.alias] }}</a></td>
-                        <td ng-if="field.type == 'hidden'">
-                            <div ng-if="field.config.dataType != 'json'">{{ result[field.alias] }}</div>
-                            <pre ng-if="field.config.dataType == 'json'">{{ result[field.alias] | json }}</pre>
-                        </td>
-                        <td ng-if="field.type != 'file' && field.type != 'hidden'">{{ result[field.alias] }}</td>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <th>Ip</th>
+                        <td>{{ result.ip }}</td>
                     </tr>
-                </tbody>
-            </table>
-            <table class="table table-bordered" ng-if="result.ip">
-                <thead>
-                <tr>
-                    <th colspan="2">Auditoría</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr>
-                    <th>Ip</th>
-                    <td>{{ result.ip }}</td>
-                </tr>
-                <tr>
-                    <th>User Agent</th>
-                    <td>{{ result.user_agent }}</td>
-                </tr>
-                </tbody>
-            </table>
+                    <tr>
+                        <th>User Agent</th>
+                        <td>{{ result.user_agent }}</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-warning" type="button" ng-click="ok()">Aceptar</button>
