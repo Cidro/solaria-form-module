@@ -3,6 +3,7 @@
 namespace Asimov\Solaria\Modules\Forms;
 
 use App;
+use Asimov\Solaria\Modules\Forms\Models\FormResult;
 use Asimov\Solaria\Modules\Forms\Models\Twig\Form as FormTwig;
 use Asimov\Solaria\Modules\Forms\Models\Form as FormModel;
 use Session;
@@ -66,8 +67,14 @@ class FormsRenderer {
         return null;
     }
 
+    function __call($name, $arguments) {
+        if($name == 'results')
+            return $this->getFormResults($arguments);
+        return null;
+    }
+
     function __isset($name) {
-        return in_array($name, ['formBuilder', 'successMessage']);
+        return in_array($name, ['formBuilder', 'successMessage', 'results']);
     }
 
 
@@ -123,5 +130,41 @@ class FormsRenderer {
             $success = '</div>' . implode('</div><div>', $success) . '</div>';
         }
         return $success;
+    }
+
+    private function getFormResults($arguments) {
+        $options = array_get($arguments, 0, []);
+        $id = array_get($options, 'id', null);
+        $formId = array_get($options, 'form_id', null);
+
+        if($id) {
+            $formResult = FormResult::find($id);
+            if($formResult) {
+                return $formResult->results;
+            }
+            return [];
+        }
+
+        if($formId) {
+            $formResults = FormResult::where(['form_id' => $formId])->get();
+            if($formResults) {
+                $results = [];
+                foreach ($formResults as $formResult) {
+                    $results[] = $formResult->results;
+                }
+                return $results;
+            }
+            return [];
+        }
+
+        $formResults = FormResult::all();
+        if($formResults) {
+            $results = [];
+            foreach ($formResults as $formResult) {
+                $results[] = $formResult->results;
+            }
+            return $results;
+        }
+        return [];
     }
 }
