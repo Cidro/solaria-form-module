@@ -26,7 +26,7 @@ class FormsController extends BackendController {
         $this->authorize('module_forms_manage_forms');
 
         view()->share([
-            'forms' => Form::with('fields')->where('site_id', $this->site->id)->get(),
+            'forms' => Form::with('fields')->where('site_id', $this->site->id)->where('show', 1)->get(),
             'pages' => Page::where(['site_id' => $this->site->id])->get(),
             'users' => User::all()
         ]);
